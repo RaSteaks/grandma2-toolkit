@@ -107,8 +107,6 @@ uv run ruff check .
 uv build
 ```
 
-测试使用模拟 Telnet 与 MCP 子进程，不修改真实 Show。
-
 ---
 
-[AGPL-3.0](LICENSE) · 非 MA Lighting 官方项目
+[AGPL-3.0](LICENSE) 
