@@ -1,0 +1,51 @@
+# Python environments and bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Test, lint and coverage output
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit*.xml
+pytest*.xml
+
+# Package build output; keep uv.lock for reproducible installs
+/build/
+/dist/
+*.egg-info/
+*.egg
+*.whl
+
+# Runtime evidence belongs in these directories, not in source control.
+# Do not ignore all XML/PNG/JSON files: fixtures, docs and examples may need them.
+/.data/
+/backups/
+/screenshots/
+/showfiles/
+*.show
+*.show.gz
+*.log
+
+# Private environment and client overrides; keep shareable templates
+.env
+.env.*
+!.env.example
+!.env.template
+/.mcp.local.json
+/.claude/settings.local.json
+
+# Editor and operating-system temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

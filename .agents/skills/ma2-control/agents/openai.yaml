@@ -1,0 +1,4 @@
+interface:
+  display_name: "MA2 / MA3D Control"
+  short_description: "Connect MA2 and MA3D, edit shows and inspect lighting"
+  default_prompt: "Use $ma2-control to connect onPC and MA3D and inspect the current Show before making requested changes."
