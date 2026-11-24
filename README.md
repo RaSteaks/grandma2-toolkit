@@ -1,30 +1,65 @@
 # grandma2-toolkit
 
-通过 Telnet 查询和编程 grandMA2 onPC，并在 MA3D 中调整灯位、相机和检查画面。
+通过 Telnet 读取 grandMA2 onPC 的 Show、编排 Cue 和执行器，并在 MA3D 中调整灯位和相机。**MCP** 让 Agent 调用控台工具，**ma2-control Skill** 告诉 Agent 如何选灯、组织命令并核对回读结果，**CLI** 适合在终端或脚本中取得相同的 JSON 结果。
 
-| 入口 | 用途 | 安装方式 |
-|---|---|---|
-| MCP 服务 | 为客户端提供 8 个工具，可读取 Show、执行编程命令、导出 XML、备份和截图 | 从 npm 启动，见[快速开始](#快速开始) |
-| `ma2-control` Skill | 指导 Agent 选择工具、组织配接和编组命令，并用回读或截图核对结果 | 在使用它的项目中安装，见 [Skill](#skill) |
-| CLI | 在终端或脚本中调用同一套操作，读取 JSON 结果 | 从源码安装，见 [CLI](#cli) |
+[快速安装](#快速开始) · [第一次只读查询](#第一次只读查询) · [MCP 工具](#mcp) · [CLI](#cli) · [配置](#配置) · [npm 包](https://www.npmjs.com/package/@rasteaks/grandma2-toolkit)
 
 ## 快速开始
 
-准备 Node.js（含 npx）和 [uv](https://docs.astral.sh/uv/)，在任意目录运行：
+**想让 Agent 帮你安装？** 在目标项目目录打开 Codex 或 Claude Code，展开对应提示词，复制整段发送。两种方式都需要 Node.js（含 npx）和 [uv](https://docs.astral.sh/uv/)。安装和发现工具时无需控台密码。
+
+<details>
+<summary><strong>Codex</strong> · 复制安装提示词</summary>
+
+```text
+请在当前项目中安装 ma2-control Skill，并为 Codex 注册 grandma2-toolkit MCP。
+先检查 node、npx、uv 和 codex 是否可用，缺少哪一项就指出来。已有相同配置时复用。
+
+1. 在项目根目录执行：
+   npx --yes skills add RaSteaks/grandma2-toolkit --skill ma2-control --agent codex -y
+2. 注册 MCP 到 Codex 用户配置：
+   codex mcp add grandma2-toolkit -- npx --yes @rasteaks/grandma2-toolkit
+3. 检查 .agents/skills/ma2-control/SKILL.md，再运行 codex mcp get grandma2-toolkit。
+   确认启动命令和参数正确。若当前会话已加载服务，列出它提供的工具。
+   若需打开新会话才能发现工具，请明确说明。
+
+本次只安装和验证。保持默认只读，跳过控台登录和 Show 操作。
+```
+
+</details>
+
+<details>
+<summary><strong>Claude Code</strong> · 复制安装提示词</summary>
+
+```text
+请在当前项目中安装 ma2-control Skill，并为 Claude Code 注册 grandma2-toolkit MCP。
+先检查 node、npx、uv 和 claude 是否可用，缺少哪一项就指出来。已有相同配置时复用。
+
+1. 在项目根目录执行：
+   npx --yes skills add RaSteaks/grandma2-toolkit --skill ma2-control --agent claude-code -y
+2. 以 local 作用域注册 stdio 服务，仅供我在当前项目使用：
+   claude mcp add --transport stdio --scope local grandma2-toolkit -- npx --yes @rasteaks/grandma2-toolkit
+3. 检查 .claude/skills/ma2-control/SKILL.md，再运行 claude mcp get grandma2-toolkit。
+   核对服务状态。若当前会话已加载服务，列出它提供的工具。
+   若需打开新会话才能发现工具，请明确说明。
+
+本次只安装和验证。保持默认只读，跳过控台登录和 Show 操作。
+```
+
+Claude Code 的 `local` 配置只对当前用户的当前项目生效。[Claude Code MCP 作用域说明](https://code.claude.com/docs/en/mcp#mcp-installation-scopes)
+
+</details>
+
+**只需启动 MCP？** 在任意目录运行以下命令。首次确认安装后，uv 会按包内的 `uv.lock` 准备 Python 环境，服务随后通过标准输入输出（stdio）等待客户端请求。
 
 ```sh
 npx @rasteaks/grandma2-toolkit
 ```
 
-首次运行时确认 npx 的安装提示，uv 会按包内的 `uv.lock` 准备 Python 环境。服务启动后通过标准输入输出（stdio）等待 MCP 请求。
+<details>
+<summary>其他 MCP 客户端 · JSON 配置与源码启动</summary>
 
-使用 Codex CLI 时，运行一次以下命令注册服务。之后 Codex 会按需启动 MCP：
-
-```sh
-codex mcp add grandma2-toolkit -- npx --yes @rasteaks/grandma2-toolkit
-```
-
-使用支持 `mcpServers` 的客户端时，将以下配置加入客户端。后台启动使用 `--yes` 自动确认安装。
+支持 `mcpServers` 的客户端可直接使用以下配置。确保客户端的 `PATH` 能找到 npx 和 uv。
 
 ```json
 {
@@ -37,33 +72,15 @@ codex mcp add grandma2-toolkit -- npx --yes @rasteaks/grandma2-toolkit
 }
 ```
 
-确保客户端能从 `PATH` 找到 npx 和 uv。启动后可直接列出工具。要连接控台，请启用 onPC 或 MA3D 的 Telnet，并通过客户端的服务进程环境提供 `MA2_PASSWORD`。默认只读，连接地址为 `127.0.0.1`，候选端口为 `30000`、`30001`。远程控台用 `MA2_HOST` 指定地址。调用 `ma2_connections`，查看 `endpoints.onpc.connected` 和 `endpoints.onpc.show` 确认编程端和当前 Show。
-
-## 使用方式
-
-### MCP
-
-客户端可直接使用 [npx 配置示例](examples/mcp.npx.json)。npx 入口默认将审计记录、导出和备份保存在用户主目录的 `.grandma2-toolkit/.data`，可通过 `MA2_OUTPUT_DIR` 指定其他目录。
-
-从源码运行 MCP 时，可在仓库根目录执行 `uv run --locked grandma2-mcp`。使用 [uv 配置示例](examples/mcp.json) 时，将 `<REPO_DIR>` 换成本机仓库的绝对路径，`<OUTPUT_DIR>` 换成保存审计记录、备份和截图的绝对路径。删除 `MA2_OUTPUT_DIR` 配置项即可使用默认目录。
-
-<details>
-<summary>查看 8 个 MCP 工具</summary>
-
-| 工具 | 功能 |
-|---|---|
-| `ma2_connections` | 同时连接 onPC 与 MA3D |
-| `ma2_status` | 读取 Show、运行时和网络状态 |
-| `ma2_list` | 查询灯型、灯层子项、Cue 范围、MAtricks 和指定屏幕的 ViewButton 等对象 |
-| `ma2_execute` | 批量执行命令，遇错停止 |
-| `ma2_export` | 导出原生 XML 并计算内容指纹 |
-| `ma2_backup` | 保存、备份 Show 并计算 SHA256 |
-| `ma3d_transform` | 调整灯具安装位置、朝向或相机 |
-| `ma3d_capture` | 保存 MA3D 窗口截图并返回图片 |
+从源码启动时，在仓库根目录执行 `uv run --locked grandma2-mcp`。使用 uv 配置模板时，将 `<REPO_DIR>` 换成仓库绝对路径，`<OUTPUT_DIR>` 换成保存备份和截图的绝对路径。省略 `MA2_OUTPUT_DIR` 即使用默认目录。[npx 配置](examples/mcp.npx.json) · [uv 配置](examples/mcp.json)
 
 </details>
 
-在 MCP 客户端调用 `ma2_list` 时，`object` 只填写对象表达式。以下参数查询第二屏视图按钮的实际绑定，返回的 `reply` 保留控台原文：
+## 第一次只读查询
+
+1. **连接控台。** 在 onPC 或 MA3D 启用 Telnet，通过 MCP 服务进程的环境变量提供 `MA2_PASSWORD`。控台位于另一台机器时，设置 `MA2_HOST` 为其地址。Telnet 使用明文传输，请在受信任的控制网络内使用。
+2. **确认 Show。** 调用 `ma2_connections`。当 `endpoints.onpc.connected` 为 `true` 时，从 `endpoints.onpc.show` 读取当前 Show 名称。工具会根据运行时路径识别 onPC 与 MA3D。要确认共享会话，还需检查两端的网络状态。
+3. **查看一个对象。** 例如，调用 `ma2_list` 查询第二屏的视图按钮。只传对象表达式，工具会补上 `List`，并在 `reply` 中返回控台原文。
 
 ```json
 {"target": "onpc", "object": "ViewButton 2.1 Thru 2.10 /screen=2"}
@@ -71,21 +88,32 @@ codex mcp add grandma2-toolkit -- npx --yes @rasteaks/grandma2-toolkit
 
 ### Skill
 
-在希望使用 Skill 的**目标项目根目录**运行：
+安装 Skill 后，可以直接在对话中描述要核对的灯光对象。例如：
 
-```sh
-npx --yes skills add RaSteaks/grandma2-toolkit --skill ma2-control --agent codex -y
-```
+> 使用 ma2-control，只读检查当前 Show 的第二页执行器。列出每根推杆绑定的 Sequence，以及该序列前五条 Cue 的触发方式。
 
-安装后可在项目的 `.agents/skills/ma2-control/SKILL.md` 查看入口。在 Codex 中用 `$ma2-control` 调用它。要实际查询或操作控台，先按快速开始配置 MCP；使用本地 CLI 时，也可以将 `MA2_TOOLKIT_ROOT` 指向已克隆的工具包根目录。在本仓库工作时可直接使用[随仓库提供的 Skill](.agents/skills/ma2-control/SKILL.md)。
+Skill 优先使用已配置的 MCP。走本地 CLI 时，可将 `MA2_TOOLKIT_ROOT` 指向工具包源码根目录。[Skill 入口](.agents/skills/ma2-control/SKILL.md) · [配接、编组与推杆速查](.agents/skills/ma2-control/references/telnet-workflows.md) · [场景与播放命令](.agents/skills/ma2-control/references/commands.md)
 
-> 使用 $ma2-control，只读检查当前 Show 第二页的执行器，列出每根推杆绑定的 Sequence 和前五条 Cue 的触发方式。
+## MCP
 
-> 使用 $ma2-control，保留 Page 3 编程，先备份，再调整指定地面灯的安装方向并截图验收。
+| 工具 | 用途 | 可核对的结果 |
+| --- | --- | --- |
+| `ma2_connections` | 同时探测 onPC 与 MA3D | 各端的连接状态、运行时和 Show |
+| `ma2_status` | 检查指定端点 | 当前 Show 和网络状态 |
+| `ma2_list` | 读取灯型、Cue 范围、MAtricks 或 ViewButton | 原生 `List` 回显 |
+| `ma2_execute` | 在指定 Show 中顺序执行命令 | 每条命令的回显和审计记录 |
+| `ma2_export` | 在本机导出原生 XML | 原生路径 `native_file`、留存副本 `file` 和内容指纹 `fingerprint` |
+| `ma2_backup` | 在本机保存并备份 onPC Show | 新备份文件和 SHA256 |
+| `ma3d_transform` | 调整灯具安装位置、朝向或相机 | 修改前后的对象回读 |
+| `ma3d_capture` | 截取 Windows 本机可见的 MA3D 窗口 | PNG 截图，供核对机位和灯光画面 |
 
-### CLI
+**写入与回读。** 写入前设置 `MA2_ALLOW_WRITE=1`，并传入与当前 Show 完全匹配的 `expected_show`。批次遇错即停，此前的命令可能已经生效。超时后先回读对象。依赖 `EditSetup` 当前目录的命令应放在同一批次，因为每次工具调用都会新建连接。
 
-CLI 示例使用仓库源码。在仓库根目录安装依赖，并给当前 PowerShell 会话设置 Telnet 凭据：
+**安装角与灯光画面。** `ma3d_transform` 操作机身或相机。Cue 中的灯头方向由 Pan/Tilt 控制。共享会话中的几何变更可能同步至 onPC。截图需要可见且未最小化的 MA3D 窗口，请结合截图中的机位、播放状态和实际光束判断效果。
+
+## CLI
+
+在仓库根目录安装依赖，并在当前 PowerShell 会话中输入 Telnet 凭据。CLI 默认操作 onPC，返回 JSON。
 
 ```powershell
 uv sync --locked
@@ -96,70 +124,57 @@ uv run grandma2 connections
 ```
 
 ```powershell
-# 查看当前 Show 已提交的灯型节点和 MAtricks 池位
 uv run grandma2 list 'LiveSetup.FixtureTypes'
 uv run grandma2 list 'MAtricks 1 Thru 10'
-
-# 查看 MA3D 相机，在本机导出效果或截图
 uv run grandma2 --target ma3d list 'Camera 50'
+```
+
+<details>
+<summary>导出效果、备份 Show 和调整相机</summary>
+
+将 Show 名称、相机编号和坐标换成现场已核对的值。`--target` 放在子命令前。位置单位为米，旋转为度，相机 FOV 为弧度。
+
+```powershell
 uv run grandma2 export 'Effect 1 Thru 10'
 uv run grandma2 capture --window-title 'MA 3D'
 
-# 开启写入；将 Show 名称和对象编号替换为现场实际值
 $env:MA2_ALLOW_WRITE = '1'
 uv run grandma2 backup --expect-show '<SHOW_NAME>'
 uv run grandma2 --target ma3d transform 'Camera 50' --expect-show '<SHOW_NAME>' --values '{"z":12.8,"rx":-2}'
 uv run grandma2 execute --expect-show '<SHOW_NAME>' --commands-file examples/commands.readback.json
 ```
 
-`--target` 放在子命令前，默认 `onpc`。位置单位为米、旋转为度、相机 FOV 为弧度。
-
-进入 `EditSetup` 修改配接时，把依赖当前目录的命令放在同一次 `execute` 调用中。每次调用都会建立新连接。提交后从 `LiveSetup` 回读灯号、灯型和实例地址。配接、像素编组与推杆绑定的完整示例见 [Telnet 操作速查](.agents/skills/ma2-control/references/telnet-workflows.md)。相机、安装角和播放示例见 [场景与播放命令](.agents/skills/ma2-control/references/commands.md)。
-
-在 onPC 本机导出对象时，工具按对象类型到 `effects`、`matricks` 或 `macros` 等原生目录读取 XML。`native_file` 指向原生文件，`file` 指向本次操作留存的副本，`fingerprint` 可用于比较两次导出的对象内容。
+</details>
 
 ## 配置
 
-通过进程环境变量配置，无内置密码。
+环境变量需传给实际运行 MCP 或 CLI 的进程。桌面客户端可能使用独立于终端的环境。
 
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `MA2_HOST` | `127.0.0.1` | 目标主机 |
-| `MA2_PORTS` | `30000,30001` | 候选 Telnet 端口 |
-| `MA2_USER` | `administrator` | 登录用户 |
-| `MA2_PASSWORD` | — | 必填 |
-| `MA2_ALLOW_WRITE` | `0` | 设为 `1` 启用写入 |
-| `MA2_TIMEOUT` | `15` | 响应超时，单位秒 |
-| `MA2_OUTPUT_DIR` | 源码启动为仓库 `.data`；npx 启动为用户主目录下的 `.grandma2-toolkit/.data` | 日志、备份、导出和截图目录；安装 wheel 后建议显式设置 |
+| 变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `MA2_HOST` | `127.0.0.1` | 控台或可视化主机地址 |
+| `MA2_PORTS` | `30000,30001` | 探测的 Telnet 端口 |
+| `MA2_USER` | `administrator` | Telnet 登录用户 |
+| `MA2_PASSWORD` | 无 | 连接设备时必填 |
+| `MA2_ALLOW_WRITE` | `0` | 设为 `1` 后，允许对匹配的 Show 执行写入命令，包括 Lua |
+| `MA2_TIMEOUT` | `15` | 响应超时秒数，可设为 1–120 |
+| `MA2_OUTPUT_DIR` | 依启动方式而定 | 审计日志、备份、XML 和截图的保存目录 |
 
-MCP 客户端不一定继承终端环境变量，请确认密码已传给服务进程。
-
-## 使用须知
-
-- **写入需匹配 Show**：开启写入后仍需提供 `expected_show`。批次失败不会回滚，超时后应先查询状态再决定是否重试。
-- **区分场景与编程**：安装朝向不是 Cue 的 Pan/Tilt；MA3D 场景修改可能同步到 onPC。两端同名 Show 不代表已加入同一会话。
-- **本机能力**：文件导出、备份仅支持本机运行时；截图需要 Windows 上可见、未最小化的 MA3D 窗口，效果仍需查看图片确认。
-- **控制网络**：Telnet 明文传输，仅用于受信任网络。通用命令接口可执行 Lua、删除等操作，写入开关不是权限沙箱。
+npx 默认保存到用户主目录的 `.grandma2-toolkit/.data`，源码默认保存到仓库的 `.data`。使用 wheel 安装时建议显式设置输出目录。
 
 ## 开发
 
-```powershell
+```sh
 uv sync --locked --group dev
-uv run pytest
 uv run ruff check .
+uv run pytest
+uv run pytest tests/npx_smoke.py
 uv build
 ```
 
-修改 npx 入口后运行 `uv run pytest tests/npx_smoke.py`，通过本地 npm 压缩包验证安装、stdio 握手和工具发现。
 
-### 发布到 npm
-
-首次启用时，在 npm 包设置的 **Trusted Publisher** 中选择 **GitHub Actions**。GitHub 用户填 `RaSteaks`，仓库填 `grandma2-toolkit`，工作流文件名填 `publish-npm.yml`，Environment 留空，并允许直接执行 `npm publish`。发布任务通过 OIDC 获取短期凭据。[npm 配置说明](https://docs.npmjs.com/trusted-publishers/)
-
-1. 更新 `package.json` 和 `pyproject.toml` 的版本，运行 `uv lock`，将版本改动推送到 GitHub。
-2. 在该提交上发布正式 GitHub Release。标签使用 `v<版本号>`，例如版本 `0.1.1` 对应 `v0.1.1`。预发布版本会跳过发布流程。
-3. 在 **Actions → Publish to npm** 查看结果。[发布工作流](.github/workflows/publish-npm.yml) 会先核对标签，运行 Ruff、Python 测试和 npx 安装测试，通过后才将该版本公开发布为 `latest`。可用 `npm view @rasteaks/grandma2-toolkit@latest version` 核对结果。
 
 ---
-此仓库为个人开发，非官方malighting skill
-[AGPL-3.0](LICENSE) 
+
+本项目由个人独立开发，是面向 MA Lighting 产品的非官方工具。
+许可证为 [AGPL-3.0](LICENSE)。
