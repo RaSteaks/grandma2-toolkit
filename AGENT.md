@@ -15,6 +15,7 @@ README 面向首次使用者，按快速开始、MCP / Skill / CLI、配置和�
 - list 支持子节点、Cue 与分屏 ViewButton 查询。需要 EditSetup 上下文的相对命令在同一 execute 批次发送，提交后从 LiveSetup 回读。
 - 本机 XML 导出按对象类型定位文件，Effect、MAtricks、Macro 分别使用 effects、matricks、macros。
 - 每条命令使用独立 Lua completion marker，超时后不自动重发；文件保存/导出额外等待异步完成。
+- 实机 onPC 3.3.4.3 可能吞掉紧邻下一条 Lua 命令的反馈。收到原命令回显并等待短暂无输入后再发送标记。probe 只批量执行 List，明确拒绝可逐项记录，连接失步须终止；DMX 读取接受以小数表示的整数字节。playback 通过 execute 复用写入保护。
 - 密码只从进程环境读取；不提交 .env、Show、原生 XML 或截图。审计写入 .data，密码脱敏。
 - Git 保留源码、Skill、配置示例及 uv.lock；忽略环境、缓存、构建产物和运行证据目录。不要全局忽略 XML/PNG/JSON，以免隐藏测试样本或文档资源。
 - 不固定任何用户的 Page、Fixture、Camera、地址映射或场馆布局。先查询后修改。

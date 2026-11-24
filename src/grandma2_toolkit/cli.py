@@ -16,10 +16,27 @@ def main():
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("connections")
     sub.add_parser("status")
+    sub.add_parser("probe").add_argument("objects", nargs="*", help="List expressions; default: sample all pools")
+    dmx = sub.add_parser("read-dmx")
+    dmx.add_argument("universe", type=int)
+    dmx.add_argument("address", type=int)
+    dmx.add_argument("--count", type=int, default=1)
+    playback = sub.add_parser("playback", help="Operate one onPC executor")
+    playback.add_argument("executor")
+    playback.add_argument("operation", choices=("go", "back", "pause", "off", "goto", "level"))
+    playback.add_argument("--expect-show", required=True)
+    playback.add_argument("--cue")
+    playback.add_argument("--level", type=int)
     for action in ("list", "export"):
         sub.add_parser(action).add_argument("object")
     backup = sub.add_parser("backup")
     backup.add_argument("--expect-show", required=True)
+    new = sub.add_parser("new-show", help="Save current changes and switch onPC to a new Show")
+    new.add_argument("name")
+    new.add_argument("--expect-show", required=True)
+    save = sub.add_parser("save-show", help="Save the current onPC Show on the selected drive")
+    save.add_argument("--as", dest="name", help="Save As using this new name")
+    save.add_argument("--expect-show", required=True)
     execute = sub.add_parser("execute")
     execute.add_argument("--expect-show", required=True)
     execute.add_argument("--command", "-c", action="append", default=[])
@@ -36,12 +53,27 @@ def main():
             result = toolkit.connections()
         elif args.action == "status":
             result = toolkit.status(args.target)
+        elif args.action == "probe":
+            result = toolkit.probe(args.objects or None, args.target)
+        elif args.action == "read-dmx":
+            result = toolkit.read_dmx(args.universe, args.address, args.count, args.target)
+        elif args.action == "playback":
+            if args.target != "onpc":
+                raise ValueError("Playback requires --target onpc")
+            result = toolkit.playback(args.executor, args.operation, args.expect_show, args.cue, args.level)
         elif args.action == "list":
             result = toolkit.list_objects(args.object, args.target)
         elif args.action == "export":
             result = toolkit.export_object(args.object, args.target)
         elif args.action == "backup":
             result = toolkit.backup_show(args.expect_show)
+        elif args.action in ("new-show", "save-show"):
+            if args.target != "onpc":
+                raise ValueError("Show management requires --target onpc")
+            if args.action == "new-show":
+                result = toolkit.new_show(args.name, args.expect_show)
+            else:
+                result = toolkit.save_show(args.expect_show, args.name)
         elif args.action == "execute":
             commands = args.command
             if args.commands_file:

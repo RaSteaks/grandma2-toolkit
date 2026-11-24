@@ -3,6 +3,7 @@
 from contextlib import ExitStack, contextmanager
 import gzip
 import re
+import shlex
 import socketserver
 import threading
 import time
@@ -15,6 +16,7 @@ from grandma2_toolkit.config import Config
 class ConsoleHandler(socketserver.StreamRequestHandler):
     def handle(self):
         prompt = " [Fixture]>"
+        pending_value = None
         self.wfile.write(b"grandMA2 Telnet\r\n")
         for raw in self.rfile:
             command = raw.decode("utf-8").strip()
@@ -29,6 +31,8 @@ class ConsoleHandler(socketserver.StreamRequestHandler):
                 else:
                     self.wfile.write(b"Logged in as User 'administrator'\r\n")
             elif "G2TK_DONE_" in command:
+                if pending_value is not None:
+                    pending_value.cancel()
                 marker = re.search(r"G2TK_DONE_[a-f0-9]+", command)[0]
                 if self.server.omit_marker:
                     continue
@@ -43,7 +47,18 @@ class ConsoleHandler(socketserver.StreamRequestHandler):
                     value = "Master" if "gma2_" in str(self.server.runtime) else "Slave"
                 else:
                     value = "3.3.4.3"
-                self.wfile.write((prompt + "G2TK_VALUE=" + value + "\r\n").encode())
+                feedback = (prompt + "G2TK_VALUE=" + value + "\r\n").encode()
+                if self.server.delay_lua:
+                    # An early second Lua command can replace the pending feedback
+                    # on the console even though both commands were acknowledged.
+                    pending_value = threading.Timer(.05, self.wfile.write, args=(feedback,))
+                    pending_value.start()
+                else:
+                    self.wfile.write(feedback)
+            elif command in self.server.responses:
+                self.wfile.write((prompt + self.server.responses[command] + "\r\n").encode())
+            elif "G2TK_DMX=" in command:
+                self.wfile.write((prompt + "G2TK_DMX=" + self.server.dmx_feedback + "\r\n").encode())
             elif command == "ChangeDest EditSetup":
                 prompt = "EditSetup >"
             elif command == "ChangeDest 4" and prompt == "EditSetup >":
@@ -58,8 +73,14 @@ class ConsoleHandler(socketserver.StreamRequestHandler):
                     command.split()[1], "importexport")
                 (self.server.runtime / directory / (name + ".xml")).write_text(
                     '<MA xmlns="http://schemas.malighting.de/grandma2/xml/MA"><Info datetime="now"/><Page index="2" name="P3"/></MA>', encoding="utf-8")
+            elif command.startswith('NewShow "'):
+                _, new_name, option = shlex.split(command)
+                if option == "/save":
+                    (self.server.runtime / "shows" / (self.server.show + ".show.gz")).write_bytes(gzip.compress(b"old-show"))
+                    self.server.show = new_name
             elif command.startswith("SaveShow"):
-                destination = self.server.runtime / "shows" / (self.server.show + ".show.gz")
+                name = shlex.split(command)[1] if command.startswith('SaveShow "') else self.server.show
+                destination = self.server.runtime / "shows" / (name + ".show.gz")
                 # Native SaveShow returns first; the file is replaced later.
                 threading.Timer(.25, lambda: destination.write_bytes(gzip.compress(b"new-show"))).start()
             self.wfile.flush()
@@ -74,6 +95,7 @@ def fake_console(runtime):
     server.daemon_threads = True
     server.runtime, server.show = runtime, "codex"
     server.commands, server.fail_login, server.omit_marker = [], False, False
+    server.responses, server.delay_lua, server.dmx_feedback = {}, False, "0.0,255.0"
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

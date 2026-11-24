@@ -138,13 +138,35 @@ Skill 优先使用已配置的 MCP。走本地 CLI 时，可将 `MA2_TOOLKIT_ROO
 | `ma2_connections` | 同时探测 onPC 与 MA3D | 各端的连接状态、运行时和 Show |
 | `ma2_status` | 检查指定端点 | 当前 Show 和网络状态 |
 | `ma2_list` | 读取灯型、Cue 范围、MAtricks 或 ViewButton | 原生 `List` 回显 |
+| `ma2_probe` | 在同一条只读连接上抽查对象池，或指定最多 64 个 List 表达式 | 起始 Show、逐项状态、前 512 个字符的样本和完整回显所在的审计目录 |
+| `ma2_read_dmx` | 对一个 Universe 中的 1–64 个连续地址采样 | 按地址排列的 DMX 字节值（0–255） |
 | `ma2_execute` | 在指定 Show 中顺序执行原生命令或 Lua，每批最多 100 行，每行最多 480 个 UTF-8 字节 | 每条命令的回显和审计记录 |
+| `ma2_playback` | 对 onPC 上一个明确的“页.推杆”执行 go、back、pause、off、goto 或 level | 检查写入开关和 Show 后返回命令回显；调用可能改变实际输出 |
 | `ma2_export` | 在本机导出原生 XML | 原生路径 `native_file`、留存副本 `file` 和内容指纹 `fingerprint` |
+| `ma2_new_show` | 保存当前 Show 的改动并切换到新命名的 onPC Show | 回读新活动 Show 名称；需另行保存以确认新文件落盘 |
+| `ma2_save_show` | 将当前 Show 存盘，或以新名称另存 | 本机内部盘核对新写入的完整 gzip；远程返回原生命令回显 |
 | `ma2_backup` | 在本机保存并备份 onPC Show | 新备份文件和 SHA256 |
 | `ma3d_transform` | 修改指定 Root 场景对象或 Camera 的 XYZ、三轴旋转，或相机 FOV | 修改前后的对象回读 |
 | `ma3d_capture` | 截取 Windows 本机可见的 MA3D 窗口 | PNG 截图，供核对机位和灯光画面 |
 
 **只读查询范围。** `ma2_list` 支持 Page、Executor、Sequence（含 Cue 范围）、Effect、Preset、Camera、Group、View、ViewButton、Layout、Fixture、Channel、Root、UserProfile、MAtricks、Macro、Screen、Layer 和 FixtureType，也可读取 `LiveSetup.FixtureTypes`、`LiveSetup.Layers` 和 `NetworkInfo`。可按编号、范围或子节点查询，ViewButton 支持指定屏幕。远程查询和编程使用 Telnet；`ma2_export` 和 `ma2_backup` 需要工具运行在端点本机，通过回环地址连接并读取原生文件。
+
+源码版还接受 Timecode、TimecodeSlot、Timer、Agenda、World、Filter、Mask、Form、Plugin、SpecialMaster、Attribute、Feature、PresetType、ChannelPage、ButtonPage、FaderPage、ViewPage、Remote 和当前执行器的 Cue。使用 `ma2_probe` 可查看具体固件和当前上下文的响应。onPC 3.3.4.3 的 ButtonPage、FaderPage 等查询曾回显根目录，需核对返回行中的对象类型。[实测说明与命令](.agents/skills/ma2-control/references/telnet-workflows.md#只读抽查与-dmx-采样)
+
+新增的 probe、read-dmx、playback、new-show 和 save-show 可通过本仓库的源码 MCP 或 CLI 使用。已发布的 npm 0.1.1 提供原有 8 个工具。
+
+### Show 文件管理
+
+以下操作会修改控台状态或磁盘文件，仅在获准切换或保存 Show 时使用。先通过 `ma2_status` 读取当前名称，传入 `expected_show`，并启用 `MA2_ALLOW_WRITE=1`。名称填写裸文件名，省略路径和 `.show.gz` 后缀。
+
+| 操作 | MCP 参数示例 | CLI（接在 `uv run grandma2` 后） |
+| --- | --- | --- |
+| 新建并切换 | `ma2_new_show` · `{"expected_show":"<当前名称>","name":"<新名称>"}` | `new-show '<新名称>' --expect-show '<当前名称>'` |
+| 保存当前 Show | `ma2_save_show` · `{"expected_show":"<当前名称>"}` | `save-show --expect-show '<当前名称>'` |
+| 另存为 | `ma2_save_show` · `{"expected_show":"<当前名称>","name":"<另存名称>"}` | `save-show --expect-show '<当前名称>' --as '<另存名称>'` |
+| 保存并复制备份 | `ma2_backup` · `{"expected_show":"<当前名称>"}` | `backup --expect-show '<当前名称>'` |
+
+新建使用 `NewShow "<新名称>" /save`，会先保存原 Show，再切换活动 Show。另存保留控台的覆盖确认，本机内部盘已存在的同名目标会在发送前被拒绝。请在控台确认选中的驱动器：本机校验读取内部盘 `shows` 目录，远程的 `file_verified=false` 仅表示已收到命令回显。切换时若连接中断，请先回读状态、检查控台提示，避免重复执行。[NewShow](https://help.malighting.com/grandMA2/en/help/key_keyword_newshow.html) · [SaveShow](https://help.malighting.com/grandMA2/en/help/key_keyword_saveshow.html)
 
 **写入与回读。** 写入前设置 `MA2_ALLOW_WRITE=1`，并传入与当前 Show 完全匹配的 `expected_show`。批次遇错即停，此前的命令可能已经生效。超时后先回读对象。依赖 `EditSetup` 当前目录的命令应放在同一批次，因为每次工具调用都会新建连接。
 
@@ -165,6 +187,8 @@ uv run grandma2 connections
 ```powershell
 uv run grandma2 list 'LiveSetup.FixtureTypes'
 uv run grandma2 list 'MAtricks 1 Thru 10'
+uv run grandma2 probe 'TimecodeSlot 1' 'Timer 1' 'Form 1' 'World 1'
+uv run grandma2 read-dmx 1 1 --count 16
 uv run grandma2 --target ma3d list 'Camera 50'
 ```
 

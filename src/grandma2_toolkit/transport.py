@@ -16,6 +16,10 @@ class MA2Error(RuntimeError):
     """An operation failed or its result is unknown; mutations must not be retried blindly."""
 
 
+class CommandRejected(MA2Error):
+    """The console returned an explicit diagnostic after completing the exchange."""
+
+
 class TelnetDecoder:
     """Strip fragmented IAC negotiation; refuse options instead of treating them as text."""
 
@@ -133,18 +137,21 @@ class MA2Client:
         validate_command(command)
         marker = "G2TK_DONE_" + uuid.uuid4().hex
         barrier = f'Lua "gma.feedback(\'{marker}\')"'
-        self.socket.sendall((command + "\r\n" + barrier + "\r\n").encode("utf-8"))
+        self.socket.sendall((command + "\r\n").encode("utf-8"))
         deadline = time.monotonic() + self.config.timeout
         data = bytearray()
+        last_input = time.monotonic()
+        barrier_sent = False
         # Match actual feedback, never the marker inside an echoed Lua command.
         done = re.compile(FEEDBACK_PREFIX + marker + r"[ \t]*$", re.M)
         while time.monotonic() < deadline:
             if select.select([self.socket], [], [], min(.2, max(0, deadline-time.monotonic())))[0]:
                 data.extend(self._recv())
+                last_input = time.monotonic()
                 if len(data) > 8 * 1024 * 1024:
                     raise MA2Error("Response exceeds 8 MiB; query a smaller range")
                 result = clean(data)
-                match = done.search(result)
+                match = done.search(result) if barrier_sent else None
                 if match:
                     result = result[:match.start()]
                     # Strip our barrier echo while retaining the command's original reply.
@@ -152,6 +159,12 @@ class MA2Client:
                     if "Executing :" not in result:
                         raise MA2Error("Command acknowledgement missing; outcome unknown")
                     return result.strip()
+            elif not barrier_sent and time.monotonic() - last_input >= .2 and b"Executing :" in data:
+                # On MA2 3.3, back-to-back Lua lines can acknowledge both but skip
+                # the first Lua feedback. Let the original reply settle before
+                # queuing the marker. The deadline still bounds both phases.
+                self.socket.sendall((barrier + "\r\n").encode("utf-8"))
+                barrier_sent = True
         raise MA2Error("Completion marker timed out; outcome unknown; do not replay writes")
 
     def command(self, command: str, allow_missing: bool = False) -> str:
@@ -159,7 +172,7 @@ class MA2Client:
         # Inspect diagnostics, not echoed commands or names containing 'ERROR'.
         diagnostics = re.sub(r"(?m)^.*Executing :.*$", "", reply)
         if re.search(r"(?im)(?:^|>)\s*(?:Error\s*#|UNKNOWN COMMAND|INVALID COMMAND|ILLEGAL|ACCESS DENIED|NOT POSSIBLE|CANNOT IMPORT|OBJECT DOES NOT EXIST)", diagnostics):
-            raise MA2Error("Console rejected command: " + reply)
+            raise CommandRejected("Console rejected command: " + reply)
         if not allow_missing and "NO OBJECTS FOUND" in diagnostics.upper():
             raise MA2Error("Console object not found: " + reply)
         return reply

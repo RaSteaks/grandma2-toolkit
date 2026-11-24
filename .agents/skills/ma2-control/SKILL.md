@@ -26,9 +26,18 @@ and Sequence-to-Executor assignments, use the [Telnet command reference](referen
 
 ## Query and mutate
 
+- To survey a live Show without touching its files, use `ma2_status`, `ma2_probe` and `ma2_read_dmx` with writes disabled.
+  Inspect object rows in the audit: an acknowledgement alone may contain the current directory listing.
+  For explicit executor control use `ma2_playback` only when playback/output changes are in scope.
+  Read the [onPC survey and DMX notes](references/telnet-workflows.md#只读抽查与-dmx-采样) for inputs and evidence boundaries.
 - Use `ma2_list` for queries; use `ma2_export` when exact object contents or before/after comparison matters.
   Pass only the object expression, e.g. `Root 10.4.*` or `Sequence 121 Cue 1 Thru 5`.
   XML fingerprints omit timestamps and whitespace, retaining object data including embedded Cue effects.
+- For an explicitly authorized onPC Show switch, `ma2_new_show` saves the current changes before
+  switching. Verify the returned active name. `ma2_save_show` saves in place or saves as a new name
+  on the selected drive. The local internal drive permits gzip verification; remote saves return
+  acknowledgement only. After a timeout or disconnect inspect the console and status before any retry.
+  Avoid new/save/backup when the task requires leaving Show files untouched.
 - Before authorized programming/geometry changes, use `ma2_backup` if a saved baseline is needed.
   It waits for a new complete SaveShow gzip. A command acknowledgement alone is not a saved-file check.
 - Writes require process configuration `MA2_ALLOW_WRITE=1` and exact `expected_show`; these do not grant

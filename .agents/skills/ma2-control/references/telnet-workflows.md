@@ -50,3 +50,17 @@
 | 保存与验收 | `Export Sequence 501 "segment_check"`、`SaveShow /nc` | 对照 Cue 数据和 Executor 绑定。通过本机工具优先使用 `ma2_export` 和 `ma2_backup`，分别等待完整 XML 与新 Show 文件 |
 
 MA 会按对象类型选择原生导出目录。预览、停止执行器和调整 MA3D 相机的命令见[场景与播放参考](commands.md)。[MA Lighting 的 Export 关键词说明](https://help.malighting.com/grandMA2/en/help/key_keyword_export.html)
+
+## 只读抽查与 DMX 采样
+
+这些入口由源码版提供。先用 `ma2_status` 核对目标，保持 `MA2_ALLOW_WRITE=0`。只读巡检使用 Telnet 返回的数据，原始回显保存在工具侧的审计目录。
+
+| 入口 | 输入示例 | 如何判断结果 |
+|---|---|---|
+| `ma2_probe` / CLI `probe` | `{"objects":["TimecodeSlot 1","Timer 1","Form 1","World 1"]}` | 省略 objects 默认抽查 41 项。自选 1–64 个表达式均须符合 ma2_list 语法。acknowledged 表示收到命令回显，empty 表示指定范围为空，rejected 表示明确拒绝。超时或断线后终止；审计保留已完成项 |
+| `ma2_read_dmx` / CLI `read-dmx` | `{"universe":1,"address":449,"count":64}` | Universe 1–256、地址 1–512，单次最多 64 个连续通道，限同一 Universe。返回控制台读值；验收物理输出和光束需另外观察 |
+| `ma2_playback` / CLI `playback` | 在允许改变输出的 Show 中，指定 executor、action、expected_show。goto 另传 cue 字符串（可含小数），level 另传 level（整数 0–100） | go / back / pause / off 操作该执行器，goto 跳 Cue，level 设置电平。按页.推杆定位，目标为 onPC；命令已确认并不证明灯光效果 |
+
+在 onPC 3.3.4.3 的一次只读抽查中，默认 41 项有 34 项收到普通回显，7 项明确报告抽查范围为空。定向查询取得了 Cue 时序、分屏按钮、灯具类型、灯层、计时器、时间码槽和效果波形等对象行。Layer、ButtonPage、FaderPage 和 NetworkInfo 在当时的上下文返回根目录内容，读取灯层可用 LiveSetup.Layers，再列已确认的 Root 子地址。无效 Root 子地址返回拒绝，其后的有效查询可继续。
+
+DMX 实测覆盖同一 Universe 的首地址和末端 64 个通道，以及另一 Universe 和 256.512 的边界地址。当次样本均为零。回放的六种动作在模拟端验证了命令与权限控制，现场测试仅做查询和采样。

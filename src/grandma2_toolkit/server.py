@@ -8,7 +8,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, ImageContent, TextContent, ToolAnnotations
 
-from .service import Toolkit
+from .service import PlaybackAction, Toolkit
 
 mcp = FastMCP("grandma2-toolkit")
 # Typed dictionary returns produce MCP structuredContent as well as readable text.
@@ -31,6 +31,23 @@ def ma2_status(target: str = "onpc") -> dict[str, Any]:
 
 
 @mcp.tool(annotations=READ)
+def ma2_probe(objects: list[str] | None = None, target: str = "onpc") -> dict[str, Any]:
+    """Sample native List queries over one verified connection with the write gate closed or open.
+
+    Omit objects to sample the object pools (including timecode, forms, filters, plugins and masters).
+    Each result is acknowledged, empty or rejected. Inspect samples or full audit replies for data.
+    A timeout or disconnect aborts the probe. Does not exercise write or playback functions.
+    """
+    return toolkit.probe(objects, target)
+
+
+@mcp.tool(annotations=READ)
+def ma2_read_dmx(universe: int, address: int, count: int = 1, target: str = "onpc") -> dict[str, Any]:
+    """Read 1..64 consecutive DMX slots within one universe. Returns console values (0..255)."""
+    return toolkit.read_dmx(universe, address, count, target)
+
+
+@mcp.tool(annotations=READ)
 def ma2_list(object: str, target: str = "onpc") -> dict[str, Any]:
     """Read a native object, range, or children. Examples: Root 10.4.*, Sequence 121 Cue 1 Thru 5,
     MAtricks 1 Thru 10, LiveSetup.FixtureTypes, Screen 2.*, ViewButton 2.1 Thru 2.10 /screen=2.
@@ -49,10 +66,41 @@ def ma2_execute(commands: list[str], expected_show: str, target: str = "onpc") -
     return toolkit.execute(commands, expected_show, target)
 
 
+@mcp.tool(annotations=WRITE)
+def ma2_playback(executor: str, action: PlaybackAction, expected_show: str,
+                 cue: str | None = None, level: int | None = None) -> dict[str, Any]:
+    """Operate one onPC executor (page.slot). Real output may change. Requires write gate and matching Show.
+
+    goto requires cue as a string; level requires a percentage (0..100). Other actions need neither.
+    Returns command acknowledgement, not proof of output or visual acceptance.
+    """
+    return toolkit.playback(executor, action, expected_show, cue, level)
+
+
 @mcp.tool(annotations=FILE)
 def ma2_export(object: str, target: str = "onpc") -> dict[str, Any]:
     """Export a local object or pool range (including Effect, MAtricks and Macro) to XML and fingerprint it."""
     return toolkit.export_object(object, target)
+
+
+@mcp.tool(annotations=WRITE)
+def ma2_new_show(name: str, expected_show: str) -> dict[str, Any]:
+    """Save current changes, create and switch the active onPC Show. Can affect the running session.
+
+    Requires write access and exact current Show. Confirms the new SHOWFILE name; use save_show
+    for explicit persistence. If disconnected during the switch, check status before retrying.
+    """
+    return toolkit.new_show(name, expected_show)
+
+
+@mcp.tool(annotations=WRITE)
+def ma2_save_show(expected_show: str, name: str | None = None) -> dict[str, Any]:
+    """Save onPC on the selected drive. Supply a new name for Save As (keeps native overwrite prompts).
+
+    On local onPC use the internal drive for file verification. Remote calls return the native reply
+    with file_verified=false. Requires write access and exact current Show.
+    """
+    return toolkit.save_show(expected_show, name)
 
 
 @mcp.tool(annotations=FILE)
