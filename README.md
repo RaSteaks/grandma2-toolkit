@@ -152,6 +152,14 @@ uv build
 
 修改 npx 入口后运行 `uv run pytest tests/npx_smoke.py`，通过本地 npm 压缩包验证安装、stdio 握手和工具发现。
 
+### 发布到 npm
+
+首次启用时，在 npm 包设置的 **Trusted Publisher** 中选择 **GitHub Actions**。GitHub 用户填 `RaSteaks`，仓库填 `grandma2-toolkit`，工作流文件名填 `publish-npm.yml`，Environment 留空，并允许直接执行 `npm publish`。发布任务通过 OIDC 获取短期凭据。[npm 配置说明](https://docs.npmjs.com/trusted-publishers/)
+
+1. 更新 `package.json` 和 `pyproject.toml` 的版本，运行 `uv lock`，将版本改动推送到 GitHub。
+2. 在该提交上发布正式 GitHub Release。标签使用 `v<版本号>`，例如版本 `0.1.1` 对应 `v0.1.1`。预发布版本会跳过发布流程。
+3. 在 **Actions → Publish to npm** 查看结果。[发布工作流](.github/workflows/publish-npm.yml) 会先核对标签，运行 Ruff、Python 测试和 npx 安装测试，通过后才将该版本公开发布为 `latest`。可用 `npm view @rasteaks/grandma2-toolkit@latest version` 核对结果。
+
 ---
 此仓库为个人开发，非官方malighting skill
 [AGPL-3.0](LICENSE) 

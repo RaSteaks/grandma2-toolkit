@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Launch the grandMA2 onPC and MA3D stdio MCP server with npx",
   "license": "AGPL-3.0-only",
-  "repository": "github:RaSteaks/grandma2-toolkit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RaSteaks/grandma2-toolkit.git"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
