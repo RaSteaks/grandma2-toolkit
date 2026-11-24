@@ -2,13 +2,12 @@
   "mcpServers": {
     "grandma2-toolkit": {
       "command": "uv",
-      "args": ["run", "--locked", "--directory", "G:/GitHub/grandma2-toolkit", "grandma2-mcp"],
+      "args": ["run", "--locked", "--directory", "<REPO_DIR>", "grandma2-mcp"],
       "env": {
         "MA2_HOST": "127.0.0.1",
         "MA2_PORTS": "30000,30001",
-        "MA2_USER": "administrator",
         "MA2_ALLOW_WRITE": "0",
-        "MA2_OUTPUT_DIR": "G:/GitHub/grandma2-toolkit/.data"
+        "MA2_OUTPUT_DIR": "<OUTPUT_DIR>"
       }
     }
   }

@@ -27,6 +27,11 @@ def test_mcp_discovery_read_and_write_gate(consoles):
             assert both.structuredContent["endpoints"]["onpc"]["port"] == onpc.server_address[1]
             result = await session.call_tool("ma2_list", {"object": "Camera 50", "target": "ma3d"})
             assert not result.isError and "灯具" in result.structuredContent["reply"]
+            for expression in ("LiveSetup.FixtureTypes", "Root 10.4.*", "FixtureType 1 Thru", "Screen 2.*",
+                               "MAtricks 1 Thru 10", "Macro 9", "Sequence 121 Cue 1.5 Thru 5",
+                               "ViewButton 2.1 Thru 2.10 /screen=2"):
+                result = await session.call_tool("ma2_list", {"object": expression})
+                assert not result.isError and f"List {expression}" in onpc.commands
             blocked = await session.call_tool("ma2_execute", {"commands": ["Assign Camera 50 /X=1"], "expected_show": "codex"})
             assert blocked.isError
             assert not any(c.startswith("Assign") for c in onpc.commands)

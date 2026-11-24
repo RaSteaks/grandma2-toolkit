@@ -14,6 +14,7 @@ from grandma2_toolkit.config import Config
 
 class ConsoleHandler(socketserver.StreamRequestHandler):
     def handle(self):
+        prompt = " [Fixture]>"
         self.wfile.write(b"grandMA2 Telnet\r\n")
         for raw in self.rfile:
             command = raw.decode("utf-8").strip()
@@ -32,7 +33,7 @@ class ConsoleHandler(socketserver.StreamRequestHandler):
                 if self.server.omit_marker:
                     continue
                 time.sleep(.02)
-                self.wfile.write((" [Fixture]>" + marker + "\r\n").encode())
+                self.wfile.write((prompt + marker + "\r\n").encode())
             elif "G2TK_VALUE=" in command:
                 if "'PATH'" in command:
                     value = str(self.server.runtime)
@@ -42,14 +43,20 @@ class ConsoleHandler(socketserver.StreamRequestHandler):
                     value = "Master" if "gma2_" in str(self.server.runtime) else "Slave"
                 else:
                     value = "3.3.4.3"
-                self.wfile.write((" [Fixture]>G2TK_VALUE=" + value + "\r\n").encode())
+                self.wfile.write((prompt + "G2TK_VALUE=" + value + "\r\n").encode())
+            elif command == "ChangeDest EditSetup":
+                prompt = "EditSetup >"
+            elif command == "ChangeDest 4" and prompt == "EditSetup >":
+                prompt = "EditSetup/Layers 4 >"
             elif command == "BadCommand":
                 self.wfile.write(b"Error #1: UNKNOWN COMMAND\r\n")
             elif command.startswith("List "):
                 self.wfile.write("No. Name X Y Z Rot.X\r\n50 灯具 0 -58 12.8 -2\r\n".encode())
             elif command.startswith("Export "):
                 name = command.split()[-1]
-                (self.server.runtime / "importexport" / (name + ".xml")).write_text(
+                directory = {"Effect": "effects", "MAtricks": "matricks", "Macro": "macros"}.get(
+                    command.split()[1], "importexport")
+                (self.server.runtime / directory / (name + ".xml")).write_text(
                     '<MA xmlns="http://schemas.malighting.de/grandma2/xml/MA"><Info datetime="now"/><Page index="2" name="P3"/></MA>', encoding="utf-8")
             elif command.startswith("SaveShow"):
                 destination = self.server.runtime / "shows" / (self.server.show + ".show.gz")
@@ -60,7 +67,8 @@ class ConsoleHandler(socketserver.StreamRequestHandler):
 
 @contextmanager
 def fake_console(runtime):
-    (runtime / "importexport").mkdir(parents=True)
+    for directory in ("importexport", "effects", "matricks", "macros"):
+        (runtime / directory).mkdir(parents=True)
     (runtime / "shows").mkdir()
     server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), ConsoleHandler)
     server.daemon_threads = True

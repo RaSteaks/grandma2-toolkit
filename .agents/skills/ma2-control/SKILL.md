@@ -10,6 +10,8 @@ Prefer MCP when configured; otherwise use `python scripts/ma2.py ...` relative t
 The launcher resolves this repository or `MA2_TOOLKIT_ROOT`; an installed `grandma2` command also works.
 
 Read [references/commands.md](references/commands.md) for native object, playback, geometry and camera examples.
+For fixture libraries and patching, ordered pixel groups, Screen/ViewButton, MAtricks, Presets/Effects
+and Sequence-to-Executor assignments, use the [Telnet command reference](references/telnet-workflows.md).
 
 ## Connect and scope
 
@@ -25,6 +27,7 @@ Read [references/commands.md](references/commands.md) for native object, playbac
 ## Query and mutate
 
 - Use `ma2_list` for queries; use `ma2_export` when exact object contents or before/after comparison matters.
+  Pass only the object expression, e.g. `Root 10.4.*` or `Sequence 121 Cue 1 Thru 5`.
   XML fingerprints omit timestamps and whitespace, retaining object data including embedded Cue effects.
 - Before authorized programming/geometry changes, use `ma2_backup` if a saved baseline is needed.
   It waits for a new complete SaveShow gzip. A command acknowledgement alone is not a saved-file check.

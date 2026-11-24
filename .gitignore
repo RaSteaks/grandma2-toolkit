@@ -41,6 +41,7 @@ pytest*.xml
 !.env.template
 /.mcp.local.json
 /.claude/settings.local.json
+.cache/
 
 # Editor and operating-system temporary files
 *.swp

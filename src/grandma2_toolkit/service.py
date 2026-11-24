@@ -16,7 +16,18 @@ import xml.etree.ElementTree as ET
 from .config import Config
 from .transport import MA2Client, MA2Error, validate_command
 
-OBJECT = re.compile(r"(?:Page|Executor|Sequence|Effect|Preset|Camera|Group|View|ViewButton|Layout|Fixture|Channel|Root|UserProfile)(?: \d+(?:\.\d+)*(?: Thru \d+(?:\.\d+)*)?)?", re.I)
+POOL = r"(?:Page|Executor|Sequence|Effect|Preset|Camera|Group|View|ViewButton|Layout|Fixture|Channel|Root|UserProfile|MAtricks|Macro)"
+ADDRESS = r"[0-9]+(?:\.[0-9]+)*"
+OBJECT = re.compile(rf"{POOL}(?: {ADDRESS}(?: Thru {ADDRESS})?)?", re.I)
+# List supports child enumeration, Cue ranges and a screen qualifier. Export takes
+# an object followed by a filename, so its argument grammar stays separate.
+LIST_RANGE = rf"{ADDRESS}(?:\.\*| Thru(?: {ADDRESS})?)?"
+LIST_OBJECT = re.compile(
+    rf"(?:(?:{POOL}|Screen|Layer|FixtureType)(?: {LIST_RANGE})?"
+    rf"|Sequence [0-9]+ Cue(?: {LIST_RANGE})?"
+    rf"|ViewButton {LIST_RANGE} /screen=[0-9]+"
+    r"|LiveSetup\.(?:FixtureTypes|Layers)|NetworkInfo)", re.I)
+EXPORT_DIRS = {"effect": "effects", "matricks": "matricks", "macro": "macros"}
 NS = {"m": "http://schemas.malighting.de/grandma2/xml/MA"}
 
 
@@ -109,7 +120,9 @@ class Toolkit:
             return {**result, "audit_dir": str(folder)}
 
     def list_objects(self, object: str, target="onpc"):
-        command = "List " + object_path(object)
+        if not LIST_OBJECT.fullmatch(object):
+            raise ValueError("Use a List object such as 'Root 10.4.*' or 'Sequence 121 Cue 1 Thru 5'")
+        command = "List " + object
         with self.operation("list", target, object) as (folder, record), self.client_factory(self.config, target) as client:
             return {"reply": self._send(client, record, command, True), "audit_dir": str(folder)}
 
@@ -143,7 +156,8 @@ class Toolkit:
         with self.operation("export", target, object) as (folder, record), self.client_factory(self.config, target) as client:
             runtime = self._local_runtime(client)
             name = "g2tk_" + uuid.uuid4().hex
-            source = runtime / "importexport" / (name + ".xml")
+            directory = EXPORT_DIRS.get(object.split()[0].lower(), "importexport")
+            source = runtime / directory / (name + ".xml")
             self._send(client, record, f"Export {object} {name}")
             deadline = time.monotonic() + self.config.timeout
             while time.monotonic() < deadline:
@@ -154,7 +168,7 @@ class Toolkit:
                 except (OSError, ET.ParseError):
                     time.sleep(.1)
             else:
-                raise MA2Error("Export did not finish; check native importexport folder")
+                raise MA2Error(f"Export did not finish; check native {directory} folder")
             output = folder / "object.xml"
             output.write_bytes(data)
             result = {"file": str(output), "native_file": str(source), "fingerprint": digest, "audit_dir": str(folder)}

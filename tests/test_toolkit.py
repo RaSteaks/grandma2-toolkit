@@ -27,6 +27,13 @@ def test_complete_unicode_reply_and_error(consoles):
             client.command("BadCommand")
 
 
+def test_commands_and_show_guard_in_patch_context(consoles):
+    config, _, _ = consoles
+    commands = ["ChangeDest EditSetup", "ChangeDest 4", "List 1.*"]
+    result = Toolkit(replace(config, allow_write=True)).execute(commands, "codex")
+    assert "灯具" in result["replies"][-1]
+
+
 def test_write_disabled_sends_no_mutation(consoles):
     config, onpc, _ = consoles
     with pytest.raises(PermissionError):
@@ -77,6 +84,25 @@ def test_failed_login_does_not_leak_password(consoles):
 def test_query_rejects_command_injection(value):
     with pytest.raises(ValueError):
         object_path(value)
+    with pytest.raises(ValueError):
+        Toolkit().list_objects(value)
+
+
+@pytest.mark.parametrize("value", ["Sequence 1 Cue 1; Off", "Root 10.4.* /nc",
+                                   "ViewButton 2.1 /screen=2 /cmd=Off", "LiveSetup.Layers\nSaveShow"])
+def test_list_rejects_unsupported_suffixes(value):
+    with pytest.raises(ValueError):
+        Toolkit().list_objects(value)
+
+
+@pytest.mark.parametrize("obj, directory", [("Effect 1 Thru 10", "effects"),
+                                            ("MAtricks 10", "matricks"), ("Macro 9", "macros")])
+def test_native_pool_export_directory(consoles, obj, directory):
+    from pathlib import Path
+    config, onpc, _ = consoles
+    result = Toolkit(config).export_object(obj)
+    assert Path(result["native_file"]).parent == onpc.runtime / directory
+    assert Path(result["file"]).read_bytes() == Path(result["native_file"]).read_bytes()
 
 
 def test_export_and_fingerprint(consoles):

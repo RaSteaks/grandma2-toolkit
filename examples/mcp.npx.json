@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "grandma2-toolkit": {
+      "command": "npx",
+      "args": ["--yes", "@rasteaks/grandma2-toolkit"]
+    }
+  }
+}

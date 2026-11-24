@@ -8,6 +8,9 @@ import uuid
 
 from .config import Config
 
+# Feedback can follow the active destination prompt on the same line.
+FEEDBACK_PREFIX = r"^[ \t]*(?:(?:\[[^\]\n]+\]|EditSetup(?:/[^>\n]+)?)[ \t]*>[ \t]*)?"
+
 
 class MA2Error(RuntimeError):
     """An operation failed or its result is unknown; mutations must not be retried blindly."""
@@ -134,7 +137,7 @@ class MA2Client:
         deadline = time.monotonic() + self.config.timeout
         data = bytearray()
         # Match actual feedback, never the marker inside an echoed Lua command.
-        done = re.compile(r"(?m)^(?:\s*\[[^\]\n]+\]>\s*)?" + marker + r"\s*$")
+        done = re.compile(FEEDBACK_PREFIX + marker + r"[ \t]*$", re.M)
         while time.monotonic() < deadline:
             if select.select([self.socket], [], [], min(.2, max(0, deadline-time.monotonic())))[0]:
                 data.extend(self._recv())
@@ -167,7 +170,7 @@ class MA2Client:
             raise ValueError("Unsupported status field")
         expr = "gma.network.getstatus()" if name == "STATUS" else f"gma.show.getvar('{name}')"
         reply = self.command(f'Lua "gma.feedback(\'G2TK_VALUE=\'..tostring({expr}))"')
-        found = re.search(r"(?m)^(?:\s*\[[^\]\n]+\]>\s*)?G2TK_VALUE=([^\n]*)", reply)
+        found = re.search(FEEDBACK_PREFIX + r"G2TK_VALUE=([^\n]*)", reply, re.M)
         if not found:
             raise MA2Error("Status feedback missing")
         return found.group(1).strip()

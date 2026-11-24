@@ -1,0 +1,20 @@
+{
+  "name": "@rasteaks/grandma2-toolkit",
+  "version": "0.1.0",
+  "description": "Launch the grandMA2 onPC and MA3D stdio MCP server with npx",
+  "license": "AGPL-3.0-only",
+  "repository": "github:RaSteaks/grandma2-toolkit",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "bin": {
+    "grandma2-mcp": "bin/grandma2-mcp.cjs"
+  },
+  "files": [
+    "bin/grandma2-mcp.cjs",
+    "pyproject.toml",
+    "uv.lock",
+    "src/grandma2_toolkit/*.py"
+  ]
+}

@@ -32,7 +32,10 @@ def ma2_status(target: str = "onpc") -> dict[str, Any]:
 
 @mcp.tool(annotations=READ)
 def ma2_list(object: str, target: str = "onpc") -> dict[str, Any]:
-    """List a native object/range, e.g. Executor 3.1 Thru 3.8 or Root 10.6.3; no command chains."""
+    """Read a native object, range, or children. Examples: Root 10.4.*, Sequence 121 Cue 1 Thru 5,
+    MAtricks 1 Thru 10, LiveSetup.FixtureTypes, Screen 2.*, ViewButton 2.1 Thru 2.10 /screen=2.
+    Pass the object expression without the List keyword. Returns the console's native text.
+    """
     return toolkit.list_objects(object, target)
 
 
@@ -48,7 +51,7 @@ def ma2_execute(commands: list[str], expected_show: str, target: str = "onpc") -
 
 @mcp.tool(annotations=FILE)
 def ma2_export(object: str, target: str = "onpc") -> dict[str, Any]:
-    """Export a local native object to unique XML and return a timestamp-independent fingerprint."""
+    """Export a local object or pool range (including Effect, MAtricks and Macro) to XML and fingerprint it."""
     return toolkit.export_object(object, target)
 
 
