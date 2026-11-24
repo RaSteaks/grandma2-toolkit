@@ -1,6 +1,6 @@
 {
   "name": "@rasteaks/grandma2-toolkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Launch the grandMA2 onPC and MA3D stdio MCP server with npx",
   "license": "AGPL-3.0-only",
   "repository": {
